@@ -1,0 +1,95 @@
+#include <LiquidCrystal.h>
+#include <SoftwareSerial.h>
+
+// Define the pins used by the flow sensor and solenoid valve
+const int flowSensorPin = 2;
+const int solenoidValvePin = 3;
+
+// Define the flow rate and water allocation constants
+const float flowRateFactor = 4.5; // The flow rate factor depends on the type of flow sensor used
+const float waterAllocation = 10.0; // The allocated amount of water in liters
+
+// Define the LCD pins
+const int rs = 7, en = 8, d4 = 9, d5 = 10, d6 = 11, d7 = 12;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
+// Initialize the SoftwareSerial object for debugging
+SoftwareSerial debugSerial(5, 6);
+
+// Define the flow rate and water usage variables
+volatile int flowPulseCount = 0;
+float flowRate = 0.0;
+float waterUsed = 0.0;
+
+// Define the interrupt service routine for the flow sensor
+void flowSensorISR() {
+  flowPulseCount++;
+}
+
+// Initialize the setup function
+void setup() {
+  // Initialize the LCD
+  lcd.begin(16, 2);
+
+  // Attach the interrupt service routine to the flow sensor pin
+  attachInterrupt(digitalPinToInterrupt(flowSensorPin), flowSensorISR, RISING);
+
+  // Set the solenoid valve pin as an output
+  pinMode(solenoidValvePin, OUTPUT);
+
+  // Initialize the SoftwareSerial object
+  debugSerial.begin(9600);
+
+  // Print the header message
+  lcd.print("Water Flow Meter");
+
+  // Wait for the sensor to stabilize
+  delay(5000);
+}
+
+// Initialize the loop function
+void loop() {
+  // Calculate the flow rate
+  flowRate = flowPulseCount / flowRateFactor;
+
+  // Calculate the water usage
+  waterUsed = waterUsed + (flowRate / 60.0);
+
+  // Print the flow rate and water usage on the LCD
+  lcd.setCursor(0, 1);
+  lcd.print("Flow: ");
+  lcd.print(flowRate);
+  lcd.print(" L/min ");
+  lcd.print("Allocated: ");
+  lcd.print(waterAllocation);
+  lcd.print(" L");
+
+  // Debugging information
+  debugSerial.print("Flow Rate: ");
+  debugSerial.print(flowRate);
+  debugSerial.print(" L/min ");
+  debugSerial.print("Water Used: ");
+  debugSerial.print(waterUsed);
+  debugSerial.print(" L");
+
+  // Check if the allocated water limit has been reached
+  if (waterUsed >= waterAllocation) {
+    // Close the solenoid valve
+    digitalWrite(solenoidValvePin, HIGH);
+
+    // Print the message on the LCD
+    lcd.setCursor(0, 0);
+    lcd.print("Water Limit Exceeded");
+  }
+  else {
+    // Open the solenoid valve
+    digitalWrite(solenoidValvePin, LOW);
+
+    // Print the message on the LCD
+    lcd.setCursor(0, 0);
+    lcd.print("Water Flow Meter ");
+  }
+
+  // Wait for a short period before repeating the loop
+  delay(1000);
+}
